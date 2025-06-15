@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,25 +7,21 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Play, Pause, RotateCcw, Plus, Trash2 } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
 
-interface DataPoint {
-  dimension: string
-  values: number[]
-}
+export default function AnimatedRankingApp() {
+  const [currentMonth, setCurrentMonth] = useState(0)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [speed, setSpeed] = useState([1000])
+  const [showDataInput, setShowDataInput] = useState(false)
+  const [newDimension, setNewDimension] = useState("")
+  const [newValues, setNewValues] = useState("")
+  const [csvError, setCsvError] = useState("")
+  const [metric, setMetric] = useState("GDP (Trillions USD)")
+  const intervalRef = useRef(null)
 
-interface ChartData {
-  dimensions: string[]
-  metric: string
-  months: string[]
-  data: DataPoint[]
-}
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-const sampleData: ChartData = {
-  dimensions: ["USA", "China", "Japan", "Germany", "India", "UK", "France", "Brazil"],
-  metric: "GDP (Trillions USD)",
-  months: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-  data: [
+  const [data, setData] = useState([
     { dimension: "USA", values: [21.4, 21.6, 21.8, 22.0, 22.2, 22.4, 22.6, 22.8, 23.0, 23.2, 23.4, 23.6] },
     { dimension: "China", values: [14.3, 14.5, 14.7, 14.9, 15.1, 15.3, 15.5, 15.7, 15.9, 16.1, 16.3, 16.5] },
     { dimension: "Japan", values: [5.1, 5.0, 4.9, 4.8, 4.9, 5.0, 5.1, 5.2, 5.1, 5.0, 4.9, 5.0] },
@@ -36,39 +30,15 @@ const sampleData: ChartData = {
     { dimension: "UK", values: [2.8, 2.7, 2.6, 2.7, 2.8, 2.9, 3.0, 2.9, 2.8, 2.7, 2.8, 2.9] },
     { dimension: "France", values: [2.6, 2.7, 2.8, 2.7, 2.6, 2.7, 2.8, 2.9, 2.8, 2.7, 2.8, 2.9] },
     { dimension: "Brazil", values: [1.8, 1.9, 2.0, 1.9, 1.8, 1.9, 2.0, 2.1, 2.0, 1.9, 2.0, 2.1] },
-  ],
-}
+  ])
 
-const colors = [
-  "#3b82f6",
-  "#ef4444",
-  "#10b981",
-  "#f59e0b",
-  "#8b5cf6",
-  "#06b6d4",
-  "#84cc16",
-  "#f97316",
-  "#ec4899",
-  "#6366f1",
-]
-
-export default function AnimatedRankingApp() {
-  const [chartData, setChartData] = useState<ChartData>(sampleData)
-  const [currentMonth, setCurrentMonth] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [speed, setSpeed] = useState([1000])
-  const [showDataInput, setShowDataInput] = useState(false)
-  const [newDimension, setNewDimension] = useState("")
-  const [newValues, setNewValues] = useState("")
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const [csvFile, setCsvFile] = useState<File | null>(null)
-  const [csvError, setCsvError] = useState<string>("")
+  const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316"]
 
   useEffect(() => {
     if (isPlaying) {
       intervalRef.current = setInterval(() => {
         setCurrentMonth((prev) => {
-          if (prev >= chartData.months.length - 1) {
+          if (prev >= months.length - 1) {
             setIsPlaying(false)
             return prev
           }
@@ -86,10 +56,10 @@ export default function AnimatedRankingApp() {
         clearInterval(intervalRef.current)
       }
     }
-  }, [isPlaying, speed, chartData.months.length])
+  }, [isPlaying, speed])
 
   const getCurrentRanking = () => {
-    return chartData.data
+    return data
       .map((item, index) => ({
         ...item,
         currentValue: item.values[currentMonth] || 0,
@@ -98,7 +68,7 @@ export default function AnimatedRankingApp() {
       .sort((a, b) => b.currentValue - a.currentValue)
   }
 
-  const maxValue = Math.max(...chartData.data.flatMap((d) => d.values))
+  const maxValue = Math.max(...data.flatMap((d) => d.values))
 
   const handlePlay = () => {
     setIsPlaying(!isPlaying)
@@ -115,25 +85,20 @@ export default function AnimatedRankingApp() {
         .split(",")
         .map((v) => Number.parseFloat(v.trim()))
         .filter((v) => !isNaN(v))
-      if (values.length === chartData.months.length) {
-        setChartData((prev) => ({
-          ...prev,
-          data: [...prev.data, { dimension: newDimension, values }],
-        }))
+
+      if (values.length === months.length) {
+        setData([...data, { dimension: newDimension, values }])
         setNewDimension("")
         setNewValues("")
       }
     }
   }
 
-  const removeDimension = (index: number) => {
-    setChartData((prev) => ({
-      ...prev,
-      data: prev.data.filter((_, i) => i !== index),
-    }))
+  const removeDimension = (index) => {
+    setData(data.filter((_, i) => i !== index))
   }
 
-  const handleCsvUpload = async (file: File) => {
+  const handleCsvUpload = async (file) => {
     try {
       const text = await file.text()
       const lines = text.trim().split("\n")
@@ -143,18 +108,15 @@ export default function AnimatedRankingApp() {
         return
       }
 
-      // Parse header
       const header = lines[0].split(",").map((h) => h.trim())
-      const dimensionHeader = header[0]
-      const months = header.slice(1)
+      const newMonths = header.slice(1)
 
-      if (months.length === 0) {
+      if (newMonths.length === 0) {
         setCsvError("CSV must have month columns")
         return
       }
 
-      // Parse data rows
-      const data: DataPoint[] = []
+      const newData = []
       for (let i = 1; i < lines.length; i++) {
         const row = lines[i].split(",").map((cell) => cell.trim())
         if (row.length !== header.length) continue
@@ -166,23 +128,17 @@ export default function AnimatedRankingApp() {
         })
 
         if (dimension) {
-          data.push({ dimension, values })
+          newData.push({ dimension, values })
         }
       }
 
-      if (data.length === 0) {
+      if (newData.length === 0) {
         setCsvError("No valid data rows found")
         return
       }
 
-      // Update chart data
-      setChartData({
-        dimensions: data.map((d) => d.dimension),
-        metric: "Uploaded Metric",
-        months: months,
-        data: data,
-      })
-
+      setData(newData)
+      setMetric("Uploaded Metric")
       setCsvError("")
       setCurrentMonth(0)
       setIsPlaying(false)
@@ -191,18 +147,13 @@ export default function AnimatedRankingApp() {
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0]
     if (file && file.type === "text/csv") {
-      setCsvFile(file)
       handleCsvUpload(file)
     } else {
       setCsvError("Please select a valid CSV file")
     }
-  }
-
-  const updateMetric = (metric: string) => {
-    setChartData((prev) => ({ ...prev, metric }))
   }
 
   const downloadSampleCSV = () => {
@@ -227,6 +178,8 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
     window.URL.revokeObjectURL(url)
   }
 
+  const ranking = getCurrentRanking()
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -243,7 +196,7 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Current Month: {chartData.months[currentMonth]}</Label>
+                <Label>Current Month: {months[currentMonth]}</Label>
                 <div className="flex gap-2">
                   <Button onClick={handlePlay} variant="outline" size="sm">
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -263,8 +216,8 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
                 <Label htmlFor="metric">Metric Name</Label>
                 <Input
                   id="metric"
-                  value={chartData.metric}
-                  onChange={(e) => updateMetric(e.target.value)}
+                  value={metric}
+                  onChange={(e) => setMetric(e.target.value)}
                   placeholder="Enter metric name"
                 />
               </div>
@@ -301,59 +254,45 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle className="flex justify-between items-center">
-                <span>{chartData.metric}</span>
-                <span className="text-lg font-mono">{chartData.months[currentMonth]}</span>
+                <span>{metric}</span>
+                <span className="text-lg font-mono">{months[currentMonth]}</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 h-96 overflow-hidden">
-                <AnimatePresence>
-                  {getCurrentRanking().map((item, index) => (
-                    <motion.div
-                      key={item.dimension}
-                      layout
-                      initial={{ opacity: 0, x: -50 }}
-                      animate={{
-                        opacity: 1,
-                        x: 0,
-                        y: index * 45,
-                      }}
-                      exit={{ opacity: 0, x: 50 }}
-                      transition={{
-                        duration: 0.5,
-                        type: "spring",
-                        stiffness: 100,
-                      }}
-                      className="absolute w-full"
-                    >
-                      <div className="flex items-center gap-3 p-2 bg-white rounded-lg shadow-sm border">
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                          style={{ backgroundColor: item.color }}
-                        >
-                          {index + 1}
+              <div className="space-y-2 h-96 overflow-hidden relative">
+                {ranking.map((item, index) => (
+                  <div
+                    key={item.dimension}
+                    className="absolute w-full transition-all duration-500 ease-in-out"
+                    style={{
+                      transform: `translateY(${index * 45}px)`,
+                    }}
+                  >
+                    <div className="flex items-center gap-3 p-2 bg-white rounded-lg shadow-sm border">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                        style={{ backgroundColor: item.color }}
+                      >
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-medium text-sm">{item.dimension}</span>
+                          <span className="text-sm font-mono">{item.currentValue.toFixed(1)}</span>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="font-medium text-sm">{item.dimension}</span>
-                            <span className="text-sm font-mono">{item.currentValue.toFixed(1)}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <motion.div
-                              className="h-2 rounded-full"
-                              style={{ backgroundColor: item.color }}
-                              initial={{ width: 0 }}
-                              animate={{
-                                width: `${(item.currentValue / maxValue) * 100}%`,
-                              }}
-                              transition={{ duration: 0.5 }}
-                            />
-                          </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="h-2 rounded-full transition-all duration-500"
+                            style={{
+                              backgroundColor: item.color,
+                              width: `${(item.currentValue / maxValue) * 100}%`,
+                            }}
+                          />
                         </div>
                       </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -394,7 +333,7 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
               <div className="space-y-2">
                 <Label>Current Dimensions</Label>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {chartData.data.map((item, index) => (
+                  {data.map((item, index) => (
                     <div key={item.dimension} className="flex items-center justify-between p-2 bg-slate-50 rounded">
                       <span className="font-medium">{item.dimension}</span>
                       <Button onClick={() => removeDimension(index)} variant="ghost" size="sm">
