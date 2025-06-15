@@ -19,7 +19,20 @@ export default function AnimatedRankingApp() {
   const [metric, setMetric] = useState("GDP (Trillions USD)")
   const intervalRef = useRef(null)
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  const [months, setMonths] = useState([
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ])
 
   const [data, setData] = useState([
     { dimension: "USA", values: [21.4, 21.6, 21.8, 22.0, 22.2, 22.4, 22.6, 22.8, 23.0, 23.2, 23.4, 23.6] },
@@ -56,7 +69,7 @@ export default function AnimatedRankingApp() {
         clearInterval(intervalRef.current)
       }
     }
-  }, [isPlaying, speed])
+  }, [isPlaying, speed, months.length])
 
   const getCurrentRanking = () => {
     return data
@@ -137,12 +150,17 @@ export default function AnimatedRankingApp() {
         return
       }
 
+      // Update both data and months
       setData(newData)
+      setMonths(newMonths)
       setMetric("Uploaded Metric")
       setCsvError("")
       setCurrentMonth(0)
       setIsPlaying(false)
+
+      console.log("CSV uploaded successfully:", { newData, newMonths })
     } catch (error) {
+      console.error("CSV upload error:", error)
       setCsvError("Error parsing CSV file")
     }
   }
@@ -321,7 +339,10 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
                     id="newValues"
                     value={newValues}
                     onChange={(e) => setNewValues(e.target.value)}
-                    placeholder="e.g., 1.7,1.8,1.9,2.0,2.1,2.2,2.3,2.4,2.5,2.6,2.7,2.8"
+                    placeholder={`e.g., ${Array(months.length)
+                      .fill(0)
+                      .map((_, i) => (i + 1) * 1.5)
+                      .join(",")}`}
                   />
                 </div>
               </div>
@@ -331,7 +352,7 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
               </Button>
 
               <div className="space-y-2">
-                <Label>Current Dimensions</Label>
+                <Label>Current Dimensions ({data.length} total)</Label>
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {data.map((item, index) => (
                     <div key={item.dimension} className="flex items-center justify-between p-2 bg-slate-50 rounded">
@@ -342,6 +363,15 @@ Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="text-xs text-slate-400 p-2 bg-slate-50 rounded">
+                <p>
+                  <strong>Current time periods:</strong> {months.join(", ")}
+                </p>
+                <p>
+                  <strong>Values per dimension:</strong> {months.length}
+                </p>
               </div>
             </CardContent>
           </Card>
