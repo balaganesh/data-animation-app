@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Ranking Visualization</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .ranking-item {
+            transition: all 0.5s ease-in-out;
+        }
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
+        .file-input {
+            cursor: pointer;
+        }
+        .file-input::-webkit-file-upload-button {
+            visibility: hidden;
+        }
+        .file-input::before {
+            content: 'Choose File';
+            display: inline-block;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 0.375rem;
+            padding: 0.5rem 1rem;
+            outline: none;
+            white-space: nowrap;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        .file-input:hover::before {
+            background: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function AnimatedRankingApp() {
+            const [currentMonth, setCurrentMonth] = useState(0);
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [speed, setSpeed] = useState(1000);
+            const [showDataInput, setShowDataInput] = useState(false);
+            const [newDimension, setNewDimension] = useState("");
+            const [newValues, setNewValues] = useState("");
+            const [csvError, setCsvError] = useState("");
+            const [metric, setMetric] = useState("GDP (Trillions USD)");
+            const intervalRef = useRef(null);
+
+            const [months, setMonths] = useState([
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            ]);
+
+            const [data, setData] = useState([
+                { dimension: "USA", values: [21.4, 21.6, 21.8, 22.0, 22.2, 22.4, 22.6, 22.8, 23.0, 23.2, 23.4, 23.6] },
+                { dimension: "China", values: [14.3, 14.5, 14.7, 14.9, 15.1, 15.3, 15.5, 15.7, 15.9, 16.1, 16.3, 16.5] },
+                { dimension: "Japan", values: [5.1, 5.0, 4.9, 4.8, 4.9, 5.0, 5.1, 5.2, 5.1, 5.0, 4.9, 5.0] },
+                { dimension: "Germany", values: [3.8, 3.9, 4.0, 4.1, 4.0, 3.9, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3] },
+                { dimension: "India", values: [2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0] },
+                { dimension: "UK", values: [2.8, 2.7, 2.6, 2.7, 2.8, 2.9, 3.0, 2.9, 2.8, 2.7, 2.8, 2.9] },
+                { dimension: "France", values: [2.6, 2.7, 2.8, 2.7, 2.6, 2.7, 2.8, 2.9, 2.8, 2.7, 2.8, 2.9] },
+                { dimension: "Brazil", values: [1.8, 1.9, 2.0, 1.9, 1.8, 1.9, 2.0, 2.1, 2.0, 1.9, 2.0, 2.1] }
+            ]);
+
+            const colors = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316"];
+
+            useEffect(() => {
+                if (isPlaying) {
+                    intervalRef.current = setInterval(() => {
+                        setCurrentMonth((prev) => {
+                            if (prev >= months.length - 1) {
+                                setIsPlaying(false);
+                                return prev;
+                            }
+                            return prev + 1;
+                        });
+                    }, speed);
+                } else {
+                    if (intervalRef.current) {
+                        clearInterval(intervalRef.current);
+                    }
+                }
+
+                return () => {
+                    if (intervalRef.current) {
+                        clearInterval(intervalRef.current);
+                    }
+                };
+            }, [isPlaying, speed, months.length]);
+
+            const getCurrentRanking = () => {
+                return data
+                    .map((item, index) => ({
+                        ...item,
+                        currentValue: item.values[currentMonth] || 0,
+                        color: colors[index % colors.length],
+                    }))
+                    .sort((a, b) => b.currentValue - a.currentValue);
+            };
+
+            const maxValue = Math.max(...data.flatMap((d) => d.values));
+
+            const handlePlay = () => {
+                setIsPlaying(!isPlaying);
+            };
+
+            const handleReset = () => {
+                setIsPlaying(false);
+                setCurrentMonth(0);
+            };
+
+            const addDimension = () => {
+                if (newDimension && newValues) {
+                    const values = newValues
+                        .split(",")
+                        .map((v) => parseFloat(v.trim()))
+                        .filter((v) => !isNaN(v));
+
+                    if (values.length === months.length) {
+                        setData([...data, { dimension: newDimension, values }]);
+                        setNewDimension("");
+                        setNewValues("");
+                    }
+                }
+            };
+
+            const removeDimension = (index) => {
+                setData(data.filter((_, i) => i !== index));
+            };
+
+            const handleCsvUpload = async (file) => {
+                try {
+                    const text = await file.text();
+                    const lines = text.trim().split("\n");
+
+                    if (lines.length < 2) {
+                        setCsvError("CSV must have at least 2 rows (header + data)");
+                        return;
+                    }
+
+                    const header = lines[0].split(",").map((h) => h.trim());
+                    const newMonths = header.slice(1);
+
+                    if (newMonths.length === 0) {
+                        setCsvError("CSV must have month columns");
+                        return;
+                    }
+
+                    const newData = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const row = lines[i].split(",").map((cell) => cell.trim());
+                        if (row.length !== header.length) continue;
+
+                        const dimension = row[0];
+                        const values = row.slice(1).map((v) => {
+                            const num = parseFloat(v);
+                            return isNaN(num) ? 0 : num;
+                        });
+
+                        if (dimension) {
+                            newData.push({ dimension, values });
+                        }
+                    }
+
+                    if (newData.length === 0) {
+                        setCsvError("No valid data rows found");
+                        return;
+                    }
+
+                    setData(newData);
+                    setMonths(newMonths);
+                    setMetric("Uploaded Metric");
+                    setCsvError("");
+                    setCurrentMonth(0);
+                    setIsPlaying(false);
+                } catch (error) {
+                    setCsvError("Error parsing CSV file");
+                }
+            };
+
+            const handleFileChange = (e) => {
+                const file = e.target.files?.[0];
+                if (file && file.type === "text/csv") {
+                    handleCsvUpload(file);
+                } else {
+                    setCsvError("Please select a valid CSV file");
+                }
+            };
+
+            const downloadSampleCSV = () => {
+                const sampleCSVContent = `Dimension,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec
+USA,21.4,21.6,21.8,22.0,22.2,22.4,22.6,22.8,23.0,23.2,23.4,23.6
+China,14.3,14.5,14.7,14.9,15.1,15.3,15.5,15.7,15.9,16.1,16.3,16.5
+Japan,5.1,5.0,4.9,4.8,4.9,5.0,5.1,5.2,5.1,5.0,4.9,5.0
+Germany,3.8,3.9,4.0,4.1,4.0,3.9,3.8,3.9,4.0,4.1,4.2,4.3
+India,2.9,3.0,3.1,3.2,3.3,3.4,3.5,3.6,3.7,3.8,3.9,4.0
+UK,2.8,2.7,2.6,2.7,2.8,2.9,3.0,2.9,2.8,2.7,2.8,2.9
+France,2.6,2.7,2.8,2.7,2.6,2.7,2.8,2.9,2.8,2.7,2.8,2.9
+Brazil,1.8,1.9,2.0,1.9,1.8,1.9,2.0,2.1,2.0,1.9,2.0,2.1`;
+
+                const blob = new Blob([sampleCSVContent], { type: "text/csv" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "sample-data-template.csv";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            };
+
+            const ranking = getCurrentRanking();
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        <div className="text-center space-y-2">
+                            <h1 className="text-4xl font-bold text-slate-800">Animated Ranking Visualization</h1>
+                            <p className="text-slate-600">Watch your data come to life with animated rankings over time</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Controls */}
+                            <div className="lg:col-span-1 bg-white rounded-lg shadow-sm border p-6">
+                                <h2 className="text-xl font-semibold mb-4">Controls</h2>
+                                
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Current Month: {months[currentMonth]}</label>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={handlePlay}
+                                                className="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 flex items-center gap-2"
+                                            >
+                                                {isPlaying ? "⏸️" : "▶️"} {isPlaying ? "Pause" : "Play"}
+                                            </button>
+                                            <button 
+                                                onClick={handleReset}
+                                                className="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                                            >
+                                                🔄 Reset
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Animation Speed: {speed}ms (50-1000ms)</label>
+                                        <input 
+                                            type="range" 
+                                            min="50" 
+                                            max="1000" 
+                                            step="50" 
+                                            value={speed}
+                                            onChange={(e) => setSpeed(parseInt(e.target.value))}
+                                            className="w-full"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Metric Name</label>
+                                        <input 
+                                            type="text"
+                                            value={metric}
+                                            onChange={(e) => setMetric(e.target.value)}
+                                            placeholder="Enter metric name"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Upload CSV Data</label>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                type="file"
+                                                accept=".csv"
+                                                onChange={handleFileChange}
+                                                className="file-input flex-1 text-sm"
+                                            />
+                                            <button 
+                                                onClick={downloadSampleCSV}
+                                                className="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 whitespace-nowrap"
+                                            >
+                                                Download Template
+                                            </button>
+                                        </div>
+                                        {csvError && <p className="text-sm text-red-600">{csvError}</p>}
+                                        <div className="text-xs text-gray-500 space-y-1">
+                                            <p>• First column: dimension names (e.g., countries, teams, schools)</p>
+                                            <p>• Remaining columns: monthly values (numbers only)</p>
+                                            <p>• Download template above for exact format</p>
+                                        </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={() => setShowDataInput(!showDataInput)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                                    >
+                                        {showDataInput ? "Hide" : "Show"} Data Input
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Chart */}
+                            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border p-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-semibold">{metric}</h2>
+                                    <span className="text-lg font-mono">{months[currentMonth]}</span>
+                                </div>
+                                
+                                <div className="relative h-96 overflow-hidden">
+                                    {ranking.map((item, index) => (
+                                        <div
+                                            key={item.dimension}
+                                            className="ranking-item absolute w-full"
+                                            style={{
+                                                transform: `translateY(${index * 45}px)`,
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-3 p-2 bg-white rounded-lg shadow-sm border">
+                                                <div
+                                                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                                                    style={{ backgroundColor: item.color }}
+                                                >
+                                                    {index + 1}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-medium text-sm">{item.dimension}</span>
+                                                        <span className="text-sm font-mono">{item.currentValue.toFixed(1)}</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                                        <div
+                                                            className="progress-bar h-2 rounded-full"
+                                                            style={{
+                                                                backgroundColor: item.color,
+                                                                width: `${(item.currentValue / maxValue) * 100}%`,
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Data Input */}
+                        {showDataInput && (
+                            <div className="bg-white rounded-lg shadow-sm border p-6">
+                                <h2 className="text-xl font-semibold mb-4">Data Management</h2>
+                                
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">New Dimension</label>
+                                            <input 
+                                                type="text"
+                                                value={newDimension}
+                                                onChange={(e) => setNewDimension(e.target.value)}
+                                                placeholder="e.g., Canada"
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Values (comma-separated)</label>
+                                            <input 
+                                                type="text"
+                                                value={newValues}
+                                                onChange={(e) => setNewValues(e.target.value)}
+                                                placeholder={`e.g., ${Array(months.length).fill(0).map((_, i) => (i + 1) * 1.5).join(",")}`}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                    
+                                    <button 
+                                        onClick={addDimension}
+                                        className="w-full px-3 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+                                    >
+                                        ➕ Add Dimension
+                                    </button>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Current Dimensions ({data.length} total)</label>
+                                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                                            {data.map((item, index) => (
+                                                <div key={item.dimension} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                                    <span className="font-medium">{item.dimension}</span>
+                                                    <button 
+                                                        onClick={() => removeDimension(index)}
+                                                        className="px-2 py-1 text-red-600 hover:bg-red-50 rounded text-sm"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="text-xs text-gray-400 p-2 bg-gray-50 rounded">
+                                        <p><strong>Current time periods:</strong> {months.join(", ")}</p>
+                                        <p><strong>Values per dimension:</strong> {months.length}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<AnimatedRankingApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
